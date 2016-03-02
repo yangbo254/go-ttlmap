@@ -1,3 +1,5 @@
+// Package ttlmap provides a map-like interface with string keys and expirable
+// items. Keys are currently limited to strings.
 package ttlmap
 
 import (
@@ -7,17 +9,20 @@ import (
 	"time"
 )
 
+// Errors returned by Set and SetNX operations.
 var (
 	ErrExists  = errors.New("item already exists")
 	ErrDrained = errors.New("map was drained")
 )
 
+// Options for initializing a Map.
 type Options struct {
 	InitialCapacity int
 	OnWillExpire    func(key string, item *Item)
 	OnWillEvict     func(key string, item *Item)
 }
 
+// Map is the equivalent of a map[string]interface{} but with expirable Items.
 type Map struct {
 	lock         sync.RWMutex
 	m            map[string]*Item
@@ -32,6 +37,7 @@ type Map struct {
 	doneChan     chan struct{}
 }
 
+// New creates a new Map with given options.
 func New(options *Options) *Map {
 	if options == nil {
 		options = &Options{}
@@ -50,12 +56,14 @@ func New(options *Options) *Map {
 	return m
 }
 
+// Len returns the number of elements in the map.
 func (m *Map) Len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	return len(m.m)
 }
 
+// Get returns the item in the map given its key.
 func (m *Map) Get(key string) *Item {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -65,6 +73,8 @@ func (m *Map) Get(key string) *Item {
 	return m.m[key]
 }
 
+// Set assigns an expirable Item with the specified key in the map.
+// ErrDrained will be returned if the map is already drained.
 func (m *Map) Set(key string, item *Item) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -81,6 +91,10 @@ func (m *Map) Set(key string, item *Item) error {
 	return nil
 }
 
+// SetNX assigns an expirable Item with the specified key in the map, only if
+// the key is not already being in use.
+// ErrExists will be returned if the key already exists.
+// ErrDrained will be returned if the map is already drained.
 func (m *Map) SetNX(key string, item *Item) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -95,6 +109,8 @@ func (m *Map) SetNX(key string, item *Item) error {
 	return nil
 }
 
+// Delete deletes the item with the specified key in the map.
+// If an item is found, it is returned.
 func (m *Map) Delete(key string) *Item {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -109,10 +125,13 @@ func (m *Map) Delete(key string) *Item {
 	return nil
 }
 
+// Draining returns the channel that is closed when the map starts draining.
 func (m *Map) Draining() <-chan struct{} {
 	return m.drainingChan
 }
 
+// Drain evicts all remaining elements from the map and terminates the usage of
+// this map.
 func (m *Map) Drain() {
 	select {
 	case m.drainChan <- struct{}{}:
