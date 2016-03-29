@@ -1,12 +1,12 @@
-# ttlmap
+# go-ttlmap
 
 [![License](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://github.com/imkira/go-ttlmap/blob/master/LICENSE.txt)
 [![GoDoc](https://godoc.org/github.com/imkira/go-ttlmap?status.svg)](https://godoc.org/github.com/imkira/go-ttlmap)
 [![Build Status](http://img.shields.io/travis/imkira/go-ttlmap.svg?style=flat)](https://travis-ci.org/imkira/go-ttlmap)
 [![Coverage](http://img.shields.io/codecov/c/github/imkira/go-ttlmap.svg?style=flat)](https://codecov.io/github/imkira/go-ttlmap)
 
-ttlmap is a [Go](http://golang.org) package that provides a map-like interface
-with string keys and expirable items.
+go-ttlmap is a [Go](http://golang.org) package that provides a map-like
+interface with string keys and expirable items.
 
 ## Install
 
