@@ -4,6 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/imkira/go-ttlmap?status.svg)](https://godoc.org/github.com/imkira/go-ttlmap)
 [![Build Status](http://img.shields.io/travis/imkira/go-ttlmap.svg?style=flat)](https://travis-ci.org/imkira/go-ttlmap)
 [![Coverage](http://img.shields.io/codecov/c/github/imkira/go-ttlmap.svg?style=flat)](https://codecov.io/github/imkira/go-ttlmap)
+[![codebeat badge](https://codebeat.co/badges/2144b08d-ed7f-4cf1-80e5-529c5751268c)](https://codebeat.co/projects/github-com-imkira-go-ttlmap)
 
 go-ttlmap is a [Go](http://golang.org) package that provides a map-like
 interface with string keys and expirable items.
