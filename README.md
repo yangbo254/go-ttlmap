@@ -21,10 +21,10 @@ go get -u github.com/imkira/go-ttlmap
 For advanced usage, make sure to check the
 [available documentation here](http://godoc.org/github.com/imkira/go-ttlmap).
 
-## Example
+## Examples
 
-For an example check out the following
-[code](http://github.com/imkira/go-ttlmap/blob/master/example/map.go).
+For examples check out the following
+[code](http://github.com/imkira/go-ttlmap/tree/master/examples).
 
 ## Contribute
 
