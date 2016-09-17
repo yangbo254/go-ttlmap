@@ -13,8 +13,8 @@ type testItem struct {
 }
 
 func TestNewMap(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	if m == nil {
 		t.Fatalf("Expecting map")
 	}
@@ -30,8 +30,8 @@ func TestNewMapWithoutOptions(t *testing.T) {
 }
 
 func TestMapGetEmpty(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	if m.Get("invalid") != nil {
 		t.Fatalf("Not expecting item")
@@ -39,8 +39,8 @@ func TestMapGetEmpty(t *testing.T) {
 }
 
 func TestMapSetGet(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
 	if err := m.Set("foo", foo); err != nil {
@@ -59,8 +59,8 @@ func TestMapSetGet(t *testing.T) {
 }
 
 func TestMapSetNXGet(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
 	if err := m.SetNX("foo", foo); err != nil {
@@ -86,8 +86,8 @@ func TestMapSetNXGet(t *testing.T) {
 }
 
 func TestMapSetDeleteGet(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
 	if err := m.Set("foo", foo); err != nil {
@@ -115,12 +115,12 @@ func TestMapSetDeleteGet(t *testing.T) {
 
 func TestMapWaitExpired(t *testing.T) {
 	var expired []*testItem
-	options := &Options{
+	opts := &Options{
 		OnWillExpire: func(key string, item *Item) {
 			expired = append(expired, &testItem{key, item, time.Now()})
 		},
 	}
-	m := New(options)
+	m := New(opts)
 	defer m.Drain()
 	start := time.Now()
 	n, min := 100, 500
@@ -167,8 +167,8 @@ func testMapSetNIncreasing(t *testing.T, m *Map, n, min int, start time.Time) {
 }
 
 func TestMapDrain(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	testMapSetN(t, m, 100, 100*time.Millisecond)
 	select {
@@ -202,12 +202,12 @@ func TestMapDrain(t *testing.T) {
 
 func TestMapSetItemReuseEvict(t *testing.T) {
 	var evicted []*testItem
-	options := &Options{
+	opts := &Options{
 		OnWillEvict: func(key string, item *Item) {
 			evicted = append(evicted, &testItem{key, item, time.Now()})
 		},
 	}
-	m := New(options)
+	m := New(opts)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	for i := 0; i < 1000; i++ {
 		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
@@ -237,12 +237,12 @@ func testMapSetN(t *testing.T, m *Map, n int, d time.Duration) {
 
 func TestMapSetSetEvict(t *testing.T) {
 	var evicted []*testItem
-	options := &Options{
+	opts := &Options{
 		OnWillEvict: func(key string, item *Item) {
 			evicted = append(evicted, &testItem{key, item, time.Now()})
 		},
 	}
-	m := New(options)
+	m := New(opts)
 	defer m.Drain()
 	item := NewItemWithTTL("hello", 1*time.Second)
 	if err := m.Set("foo", item); err != nil {
@@ -262,12 +262,12 @@ func TestMapSetSetEvict(t *testing.T) {
 
 func TestMapExpireAlreadyExpired(t *testing.T) {
 	var expired []*testItem
-	options := &Options{
+	opts := &Options{
 		OnWillExpire: func(key string, item *Item) {
 			expired = append(expired, &testItem{key, item, time.Now()})
 		},
 	}
-	m := New(options)
+	m := New(opts)
 	defer m.Drain()
 	time.Sleep(100 * time.Millisecond)
 	start := time.Now()
@@ -292,8 +292,8 @@ func TestMapExpireAlreadyExpired(t *testing.T) {
 }
 
 func TestMapGetAlreadyExpired(t *testing.T) {
-	options := &Options{}
-	m := New(options)
+	opts := &Options{}
+	m := New(opts)
 	defer m.Drain()
 	time.Sleep(100 * time.Millisecond)
 	start := time.Now()
@@ -391,9 +391,15 @@ func BenchmarkMapSetDelete1(b *testing.B) {
 
 func BenchmarkMapSetDrainN(b *testing.B) {
 	b.StopTimer()
-	m := New(nil)
+	opts := &Options{
+		InitialCapacity: b.N,
+		OnWillEvict: func(key string, item *Item) {
+			// do nothing
+		},
+	}
+	m := New(opts)
+	value := NewItemWithTTL("bar", 30*time.Minute)
 	for i := 0; i < b.N; i++ {
-		value := NewItemWithTTL("bar", 30*time.Minute)
 		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
 			b.Fatal(err)
 		}
