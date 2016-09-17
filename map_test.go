@@ -210,7 +210,9 @@ func TestMapSetItemReuseEvict(t *testing.T) {
 	m := New(options)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	for i := 0; i < 1000; i++ {
-		m.Set(fmt.Sprintf("%d", i), value)
+		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if len(evicted) != 0 {
 		t.Fatalf("Invalid length")
@@ -319,7 +321,9 @@ func TestMapGetAlreadyExpired(t *testing.T) {
 func BenchmarkMapGet1(b *testing.B) {
 	b.StopTimer()
 	m := New(nil)
-	m.Set("foo", NewItemWithTTL("bar", 30*time.Minute))
+	if err := m.Set("foo", NewItemWithTTL("bar", 30*time.Minute)); err != nil {
+		b.Fatal(err)
+	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		m.Get("foo")
@@ -334,7 +338,9 @@ func BenchmarkMapSet1(b *testing.B) {
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		m.Set("foo", value)
+		if err := m.Set("foo", value); err != nil {
+			b.Fatal(err)
+		}
 	}
 	b.StopTimer()
 	m.Drain()
@@ -345,8 +351,13 @@ func BenchmarkMapSetNX1(b *testing.B) {
 	m := New(nil)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
+	if err := m.SetNX("foo", value); err != nil {
+		b.Fatal(err)
+	}
 	for i := 0; i < b.N; i++ {
-		m.SetNX("foo", value)
+		if err := m.SetNX("foo", value); err != ErrExists {
+			b.Fatal("Expecting already exists")
+		}
 	}
 	b.StopTimer()
 	m.Drain()
@@ -369,7 +380,9 @@ func BenchmarkMapSetDelete1(b *testing.B) {
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		m.Set("foo", value)
+		if err := m.Set("foo", value); err != nil {
+			b.Fatal(err)
+		}
 		m.Delete("foo")
 	}
 	b.StopTimer()
@@ -381,7 +394,9 @@ func BenchmarkMapSetDrainN(b *testing.B) {
 	m := New(nil)
 	for i := 0; i < b.N; i++ {
 		value := NewItemWithTTL("bar", 30*time.Minute)
-		m.Set(fmt.Sprintf("%d", i), value)
+		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
+			b.Fatal(err)
+		}
 	}
 	b.StartTimer()
 	m.Drain()
