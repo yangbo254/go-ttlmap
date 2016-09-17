@@ -5,6 +5,7 @@
 [![Build Status](http://img.shields.io/travis/imkira/go-ttlmap.svg?style=flat)](https://travis-ci.org/imkira/go-ttlmap)
 [![Coverage](https://codecov.io/gh/imkira/go-ttlmap/branch/master/graph/badge.svg)](https://codecov.io/gh/imkira/go-ttlmap)
 [![codebeat badge](https://codebeat.co/badges/2144b08d-ed7f-4cf1-80e5-529c5751268c)](https://codebeat.co/projects/github-com-imkira-go-ttlmap)
+[![goreportcard](https://goreportcard.com/badge/github.com/imkira/go-ttlmap)](https://goreportcard.com/report/github.com/imkira/go-ttlmap)
 
 go-ttlmap is a [Go](http://golang.org) package that provides an in-memory
 key-value cache with notification events for storing TTL-based expirable items.
