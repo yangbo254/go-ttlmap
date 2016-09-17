@@ -37,9 +37,9 @@ func (pq *pqueue) Pop() interface{} {
 	return item
 }
 
-func (pq pqueue) peek() (*pqitem, bool) {
-	if pq.Len() == 0 {
-		return nil, false
+func (pq pqueue) peek() *pqitem {
+	if len(pq) == 0 {
+		return nil
 	}
-	return pq[0], true
+	return pq[0]
 }

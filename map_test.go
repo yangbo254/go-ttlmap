@@ -294,3 +294,75 @@ func TestMapGetAlreadyExpired(t *testing.T) {
 		t.Fatalf("Expecting get to succeed")
 	}
 }
+
+func BenchmarkMapGet1(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	m.Set("foo", NewItemWithTTL("bar", 30*time.Minute))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		m.Get("foo")
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapSet1(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	value := NewItemWithTTL("bar", 30*time.Minute)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		m.Set("foo", value)
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapSetNX1(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	value := NewItemWithTTL("bar", 30*time.Minute)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		m.SetNX("foo", value)
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapDelete1(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		m.Delete("foo")
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapSetDelete1(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	value := NewItemWithTTL("bar", 30*time.Minute)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		m.Set("foo", value)
+		m.Delete("foo")
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapSetDrainN(b *testing.B) {
+	b.StopTimer()
+	m := New(nil)
+	for i := 0; i < b.N; i++ {
+		value := NewItemWithTTL("bar", 30*time.Minute)
+		m.Set(fmt.Sprintf("%d", i), value)
+	}
+	b.StartTimer()
+	m.Drain()
+	b.StopTimer()
+}

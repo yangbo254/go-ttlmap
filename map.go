@@ -27,6 +27,7 @@ type Map struct {
 	lock         sync.RWMutex
 	m            map[string]*Item
 	pq           pqueue
+	updating     bool
 	drained      bool
 	onWillExpire func(key string, item *Item)
 	onWillEvict  func(key string, item *Item)
@@ -59,26 +60,29 @@ func New(options *Options) *Map {
 // Len returns the number of elements in the map.
 func (m *Map) Len() int {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-	return len(m.m)
+	n := len(m.m)
+	m.lock.RUnlock()
+	return n
 }
 
 // Get returns the item in the map given its key.
 func (m *Map) Get(key string) *Item {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
 	if m.drained {
+		m.lock.RUnlock()
 		return nil
 	}
-	return m.m[key]
+	item := m.m[key]
+	m.lock.RUnlock()
+	return item
 }
 
 // Set assigns an expirable Item with the specified key in the map.
 // ErrDrained will be returned if the map is already drained.
 func (m *Map) Set(key string, item *Item) error {
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	if m.drained {
+		m.lock.Unlock()
 		return ErrDrained
 	}
 	item2 := m.m[key]
@@ -88,6 +92,7 @@ func (m *Map) Set(key string, item *Item) error {
 		}
 	}
 	m.set(key, item)
+	m.lock.Unlock()
 	return nil
 }
 
@@ -97,15 +102,17 @@ func (m *Map) Set(key string, item *Item) error {
 // ErrDrained will be returned if the map is already drained.
 func (m *Map) SetNX(key string, item *Item) error {
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	if m.drained {
+		m.lock.Unlock()
 		return ErrDrained
 	}
 	item2 := m.m[key]
 	if item2 != nil {
+		m.lock.Unlock()
 		return ErrExists
 	}
 	m.set(key, item)
+	m.lock.Unlock()
 	return nil
 }
 
@@ -113,15 +120,17 @@ func (m *Map) SetNX(key string, item *Item) error {
 // If an item is found, it is returned.
 func (m *Map) Delete(key string) *Item {
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	if m.drained {
+		m.lock.Unlock()
 		return nil
 	}
 	item := m.m[key]
 	if item != nil {
 		m.delete(key, item.index)
+		m.lock.Unlock()
 		return item
 	}
+	m.lock.Unlock()
 	return nil
 }
 
@@ -148,13 +157,17 @@ func (m *Map) set(key string, item *Item) {
 		item: item,
 	}
 	heap.Push(&m.pq, pqi)
-	m.signalChanges()
+	if pqi.item.index == 0 {
+		m.signalUpdate()
+	}
 }
 
 func (m *Map) delete(key string, index int) {
 	delete(m.m, key)
 	heap.Remove(&m.pq, index)
-	m.signalChanges()
+	if index == 0 {
+		m.signalUpdate()
+	}
 }
 
 func (m *Map) tryExpire(key string, item *Item) bool {
@@ -175,10 +188,13 @@ func (m *Map) evict(key string, item *Item) {
 	m.delete(key, item.index)
 }
 
-func (m *Map) signalChanges() {
-	select {
-	case m.updateChan <- struct{}{}:
-	default:
+func (m *Map) signalUpdate() {
+	if !m.updating {
+		m.updating = true
+		select {
+		case m.updateChan <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -192,44 +208,55 @@ func (m *Map) run() {
 		case <-m.drainingChan:
 			return
 		case <-m.updateChan:
-			m.updateTimer(timer)
+			m.update(timer, false)
 		case <-timer.C:
-			timer.Stop()
-			m.evictExpired()
-			m.updateTimer(timer)
+			m.update(timer, true)
 		}
 	}
 }
 
-func (m *Map) updateTimer(timer *time.Timer) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	if pqi, ok := m.pq.peek(); ok {
-		duration := pqi.item.TTL()
-		if duration < 0 {
-			duration = 0
-		}
-		timer.Reset(duration)
+func (m *Map) update(timer *time.Timer, evict bool) {
+	m.lock.Lock()
+	if evict {
+		m.evictExpired()
 	}
+	m.updating = false
+	duration, ok := m.nextTTL()
+	m.lock.Unlock()
+	if ok {
+		timer.Reset(duration)
+	} else {
+		timer.Stop()
+	}
+}
+
+func (m *Map) nextTTL() (time.Duration, bool) {
+	pqi := m.pq.peek()
+	if pqi == nil {
+		return 0, false
+	}
+	duration := pqi.item.TTL()
+	if duration < 0 {
+		duration = 0
+	}
+	return duration, true
 }
 
 func (m *Map) evictExpired() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	for pqi, ok := m.pq.peek(); ok; {
+	for pqi := m.pq.peek(); pqi != nil; {
 		if !m.tryExpire(pqi.key, pqi.item) {
 			break
 		}
-		pqi, ok = m.pq.peek()
+		pqi = m.pq.peek()
 	}
 }
 
 func (m *Map) drain() {
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	m.drained = true
-	for pqi, ok := m.pq.peek(); ok; {
+	for pqi := m.pq.peek(); pqi != nil; {
 		m.evict(pqi.key, pqi.item)
-		pqi, ok = m.pq.peek()
+		pqi = m.pq.peek()
 	}
+	m.lock.Unlock()
 }
