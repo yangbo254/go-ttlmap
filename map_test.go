@@ -405,6 +405,8 @@ func BenchmarkMapSetDrainN(b *testing.B) {
 		}
 	}
 	b.StartTimer()
-	m.Drain()
+	for i := 0; i < b.N; i++ {
+		m.Drain()
+	}
 	b.StopTimer()
 }
