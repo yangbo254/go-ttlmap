@@ -25,7 +25,7 @@ type Options struct {
 // Map is the equivalent of a map[string]interface{} but with expirable Items.
 type Map struct {
 	lock         sync.RWMutex
-	m            map[string]*Item
+	m            map[string]*pqitem
 	pq           pqueue
 	updating     bool
 	drained      bool
@@ -44,7 +44,7 @@ func New(options *Options) *Map {
 		options = &Options{}
 	}
 	m := &Map{
-		m:            make(map[string]*Item, options.InitialCapacity),
+		m:            make(map[string]*pqitem, options.InitialCapacity),
 		pq:           make(pqueue, 0, options.InitialCapacity),
 		onWillExpire: options.OnWillExpire,
 		onWillEvict:  options.OnWillEvict,
@@ -72,9 +72,12 @@ func (m *Map) Get(key string) *Item {
 		m.lock.RUnlock()
 		return nil
 	}
-	item := m.m[key]
+	pqi := m.m[key]
 	m.lock.RUnlock()
-	return item
+	if pqi != nil {
+		return pqi.item
+	}
+	return nil
 }
 
 // Set assigns an expirable Item with the specified key in the map.
@@ -85,10 +88,9 @@ func (m *Map) Set(key string, item *Item) error {
 		m.lock.Unlock()
 		return ErrDrained
 	}
-	item2 := m.m[key]
-	if item2 != nil {
-		if !m.tryExpire(key, item2) {
-			m.evict(key, item2)
+	if pqi := m.m[key]; pqi != nil {
+		if !m.tryExpire(key, pqi) {
+			m.evict(key, pqi)
 		}
 	}
 	m.set(key, item)
@@ -106,8 +108,7 @@ func (m *Map) SetNX(key string, item *Item) error {
 		m.lock.Unlock()
 		return ErrDrained
 	}
-	item2 := m.m[key]
-	if item2 != nil {
+	if pqi := m.m[key]; pqi != nil {
 		m.lock.Unlock()
 		return ErrExists
 	}
@@ -124,11 +125,10 @@ func (m *Map) Delete(key string) *Item {
 		m.lock.Unlock()
 		return nil
 	}
-	item := m.m[key]
-	if item != nil {
-		m.delete(key, item.index)
+	if pqi := m.m[key]; pqi != nil {
+		m.delete(key, pqi.index)
 		m.lock.Unlock()
-		return item
+		return pqi.item
 	}
 	m.lock.Unlock()
 	return nil
@@ -151,13 +151,14 @@ func (m *Map) Drain() {
 }
 
 func (m *Map) set(key string, item *Item) {
-	m.m[key] = item
 	pqi := &pqitem{
-		key:  key,
-		item: item,
+		key:   key,
+		item:  item,
+		index: -1,
 	}
+	m.m[key] = pqi
 	heap.Push(&m.pq, pqi)
-	if pqi.item.index == 0 {
+	if pqi.index == 0 {
 		m.signalUpdate()
 	}
 }
@@ -170,22 +171,22 @@ func (m *Map) delete(key string, index int) {
 	}
 }
 
-func (m *Map) tryExpire(key string, item *Item) bool {
-	if item.Expired() {
+func (m *Map) tryExpire(key string, pqi *pqitem) bool {
+	if pqi.item.Expired() {
 		if m.onWillExpire != nil {
-			m.onWillExpire(key, item)
+			m.onWillExpire(key, pqi.item)
 		}
-		m.evict(key, item)
+		m.evict(key, pqi)
 		return true
 	}
 	return false
 }
 
-func (m *Map) evict(key string, item *Item) {
+func (m *Map) evict(key string, pqi *pqitem) {
 	if m.onWillEvict != nil {
-		m.onWillEvict(key, item)
+		m.onWillEvict(key, pqi.item)
 	}
-	m.delete(key, item.index)
+	m.delete(key, pqi.index)
 }
 
 func (m *Map) signalUpdate() {
@@ -244,7 +245,7 @@ func (m *Map) nextTTL() (time.Duration, bool) {
 
 func (m *Map) evictExpired() {
 	for pqi := m.pq.peek(); pqi != nil; {
-		if !m.tryExpire(pqi.key, pqi.item) {
+		if !m.tryExpire(pqi.key, pqi) {
 			break
 		}
 		pqi = m.pq.peek()
@@ -255,7 +256,7 @@ func (m *Map) drain() {
 	m.lock.Lock()
 	m.drained = true
 	for pqi := m.pq.peek(); pqi != nil; {
-		m.evict(pqi.key, pqi.item)
+		m.evict(pqi.key, pqi)
 		pqi = m.pq.peek()
 	}
 	m.lock.Unlock()

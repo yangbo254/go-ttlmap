@@ -6,7 +6,6 @@ import "time"
 type Item struct {
 	value      interface{}
 	expiration time.Time
-	index      int
 }
 
 // NewItem creates an item with the specified value and expiring on the
@@ -15,7 +14,6 @@ func NewItem(value interface{}, expiration time.Time) *Item {
 	return &Item{
 		value:      value,
 		expiration: expiration,
-		index:      -1,
 	}
 }
 

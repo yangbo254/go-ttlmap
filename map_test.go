@@ -200,6 +200,27 @@ func TestMapDrain(t *testing.T) {
 	}
 }
 
+func TestMapSetItemReuseEvict(t *testing.T) {
+	var evicted []*testItem
+	options := &Options{
+		OnWillEvict: func(key string, item *Item) {
+			evicted = append(evicted, &testItem{key, item, time.Now()})
+		},
+	}
+	m := New(options)
+	value := NewItemWithTTL("bar", 30*time.Minute)
+	for i := 0; i < 1000; i++ {
+		m.Set(fmt.Sprintf("%d", i), value)
+	}
+	if len(evicted) != 0 {
+		t.Fatalf("Invalid length")
+	}
+	m.Drain()
+	if len(evicted) != 1000 {
+		t.Fatalf("Invalid length")
+	}
+}
+
 func testMapSetN(t *testing.T, m *Map, n int, d time.Duration) {
 	for i := 0; i < n; i++ {
 		item := NewItemWithTTL("value", d)
