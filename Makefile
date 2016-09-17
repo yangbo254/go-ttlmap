@@ -1,4 +1,4 @@
-.PHONY: all gofmt golint govet test
+.PHONY: all deps gometalinter test cover
 
 all: gometalinter test cover
 
