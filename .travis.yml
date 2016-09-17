@@ -10,10 +10,10 @@ go:
   - tip
 
 before_install:
-  - make deps
+  - if [[ $TRAVIS_GO_VERSION == 1.7* ]]; then make deps; fi
 
 script:
-  - make gometalinter
+  - if [[ $TRAVIS_GO_VERSION == 1.7* ]]; then make gometalinter; fi
   - make test
   - make cover
 
