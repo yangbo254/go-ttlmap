@@ -15,7 +15,7 @@ gometalinter:
 		--enable=unused
 
 test:
-	go test -v -race -cpu=1,2,4 -coverprofile=coverage.txt -covermode=atomic
+	go test -v -race -cpu=1,2,4 -coverprofile=coverage.txt -covermode=atomic -benchmem -bench .
 
 cover:
 	go tool cover -html=coverage.txt -o coverage.html
