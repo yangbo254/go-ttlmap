@@ -123,21 +123,8 @@ func TestMapWaitExpired(t *testing.T) {
 	m := New(options)
 	defer m.Drain()
 	start := time.Now()
-	min := 500
-	n := 100
-	for i := 0; i < n; i++ {
-		key := fmt.Sprintf("%d", i)
-		value := fmt.Sprintf("value for %s", key)
-		ttl := time.Duration(i+min) * time.Millisecond
-		expiration := start.Add(ttl)
-		item := NewItem(value, expiration)
-		if err := m.SetNX(key, item); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if m.Len() != n {
-		t.Fatalf("Invalid length")
-	}
+	n, min := 100, 500
+	testMapSetNIncreasing(t, m, n, min, start)
 	time.Sleep(1 * time.Second)
 	if m.Len() != 0 {
 		t.Fatalf("Invalid length")
@@ -163,18 +150,27 @@ func TestMapWaitExpired(t *testing.T) {
 	}
 }
 
+func testMapSetNIncreasing(t *testing.T, m *Map, n, min int, start time.Time) {
+	for i := 0; i < n; i++ {
+		key := fmt.Sprintf("%d", i)
+		value := fmt.Sprintf("value for %s", key)
+		ttl := time.Duration(i+min) * time.Millisecond
+		expiration := start.Add(ttl)
+		item := NewItem(value, expiration)
+		if err := m.SetNX(key, item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if m.Len() != n {
+		t.Fatalf("Invalid length")
+	}
+}
+
 func TestMapDrain(t *testing.T) {
 	options := &Options{}
 	m := New(options)
 	defer m.Drain()
-	n := 100
-	for i := 0; i < n; i++ {
-		item := NewItemWithTTL("value", 100*time.Millisecond)
-		m.Set(fmt.Sprintf("%d", i), item)
-	}
-	if m.Len() != 100 {
-		t.Fatalf("Invalid length")
-	}
+	testMapSetN(t, m, 100, 100*time.Millisecond)
 	select {
 	case <-m.Draining():
 		t.Fatalf("Expecting not draining")
@@ -201,6 +197,18 @@ func TestMapDrain(t *testing.T) {
 	}
 	if item := m.Delete("1"); item != nil {
 		t.Fatalf("Not expecting item")
+	}
+}
+
+func testMapSetN(t *testing.T, m *Map, n int, d time.Duration) {
+	for i := 0; i < n; i++ {
+		item := NewItemWithTTL("value", d)
+		if err := m.SetNX(fmt.Sprintf("%d", i), item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if m.Len() != n {
+		t.Fatalf("Invalid length")
 	}
 }
 
