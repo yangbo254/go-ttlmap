@@ -4,18 +4,12 @@ package ttlmap
 
 import "errors"
 
-// Errors returned by Set and SetNX operations.
+// Errors returned Map operations.
 var (
-	ErrExists  = errors.New("item already exists")
-	ErrDrained = errors.New("map was drained")
+	ErrNotExist = errors.New("key does not exist")
+	ErrExist    = errors.New("key already exists")
+	ErrDrained  = errors.New("map was drained")
 )
-
-// Options for initializing a Map.
-type Options struct {
-	InitialCapacity int
-	OnWillExpire    func(key string, item *Item)
-	OnWillEvict     func(key string, item *Item)
-}
 
 // Map is the equivalent of a map[string]interface{} but with expirable Items.
 type Map struct {
@@ -61,38 +55,17 @@ func (m *Map) Get(key string) *Item {
 }
 
 // Set assigns an expirable Item with the specified key in the map.
+// ErrExist or ErrNotExist may be returned depending on opts.KeyExist.
 // ErrDrained will be returned if the map is already drained.
-func (m *Map) Set(key string, item *Item) error {
+func (m *Map) Set(key string, item *Item, opts *SetOptions) error {
 	m.store.Lock()
 	if m.keeper.drained {
 		m.store.Unlock()
 		return ErrDrained
 	}
-	if pqi := m.store.kv[key]; pqi != nil {
-		m.expireOrEvict(pqi)
-	}
-	m.set(key, item)
+	err := m.set(key, item, opts)
 	m.store.Unlock()
-	return nil
-}
-
-// SetNX assigns an expirable Item with the specified key in the map, only if
-// the key is not already being in use.
-// ErrExists will be returned if the key already exists.
-// ErrDrained will be returned if the map is already drained.
-func (m *Map) SetNX(key string, item *Item) error {
-	m.store.Lock()
-	if m.keeper.drained {
-		m.store.Unlock()
-		return ErrDrained
-	}
-	if pqi := m.store.kv[key]; pqi != nil {
-		m.store.Unlock()
-		return ErrExists
-	}
-	m.set(key, item)
-	m.store.Unlock()
-	return nil
+	return err
 }
 
 // Delete deletes the item with the specified key in the map.
@@ -124,16 +97,15 @@ func (m *Map) Drain() {
 	<-m.keeper.doneChan
 }
 
-func (m *Map) expireOrEvict(pqi *pqitem) {
-	if pqi.index == 0 {
-		m.keeper.signalUpdate()
+func (m *Map) set(key string, item *Item, opts *SetOptions) error {
+	if pqi := m.store.kv[key]; pqi != nil {
+		if opts.keyExist() == KeyExistNotYet {
+			return ErrExist
+		}
+		m.expireOrEvict(pqi)
+	} else if opts.keyExist() == KeyExistAlready {
+		return ErrNotExist
 	}
-	if !m.store.tryExpire(pqi) {
-		m.store.evict(pqi)
-	}
-}
-
-func (m *Map) set(key string, item *Item) {
 	pqi := &pqitem{
 		key:   key,
 		item:  item,
@@ -142,6 +114,16 @@ func (m *Map) set(key string, item *Item) {
 	m.store.set(pqi)
 	if pqi.index == 0 {
 		m.keeper.signalUpdate()
+	}
+	return nil
+}
+
+func (m *Map) expireOrEvict(pqi *pqitem) {
+	if pqi.index == 0 {
+		m.keeper.signalUpdate()
+	}
+	if !m.store.tryExpire(pqi) {
+		m.store.evict(pqi)
 	}
 }
 

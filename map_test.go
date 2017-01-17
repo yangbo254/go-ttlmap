@@ -43,44 +43,73 @@ func TestMapSetGet(t *testing.T) {
 	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
-	if err := m.Set("foo", foo); err != nil {
+	if err := m.Set("foo", foo, nil); err != nil {
 		t.Fatal(err)
 	}
 	if item := m.Get("foo"); item != foo || item.Value() != "hello" {
 		t.Fatalf("Invalid item")
 	}
 	bar := NewItemWithTTL("world", 1*time.Second)
-	if err := m.Set("bar", bar); err != nil {
+	if err := m.Set("bar", bar, nil); err != nil {
 		t.Fatal(err)
 	}
-	if item := m.Get("bar"); item != bar || bar.Value() != "world" {
+	if item := m.Get("bar"); item != bar || item.Value() != "world" {
 		t.Fatalf("Invalid item")
 	}
 }
 
 func TestMapSetNXGet(t *testing.T) {
+	nx := &SetOptions{KeyExist: KeyExistNotYet}
 	opts := &Options{}
 	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
-	if err := m.SetNX("foo", foo); err != nil {
+	if err := m.Set("foo", foo, nx); err != nil {
 		t.Fatal(err)
 	}
 	if item := m.Get("foo"); item != foo || item.Value() != "hello" {
 		t.Fatalf("Invalid item")
 	}
 	bar := NewItemWithTTL("world", 1*time.Second)
-	if err := m.SetNX("bar", bar); err != nil {
+	if err := m.Set("bar", bar, nx); err != nil {
 		t.Fatal(err)
 	}
-	if item := m.Get("bar"); item != bar || bar.Value() != "world" {
+	if item := m.Get("bar"); item != bar || item.Value() != "world" {
 		t.Fatalf("Invalid item")
 	}
 	bar2 := NewItemWithTTL("world2", 1*time.Second)
-	if err := m.SetNX("bar", bar2); err != ErrExists {
+	if err := m.Set("bar", bar2, nx); err != ErrExist {
 		t.Fatal(err)
 	}
-	if item := m.Get("bar"); item != bar || bar.Value() != "world" {
+	if item := m.Get("bar"); item != bar || item.Value() != "world" {
+		t.Fatalf("Invalid item")
+	}
+}
+
+func TestMapSetXXGet(t *testing.T) {
+	xx := &SetOptions{KeyExist: KeyExistAlready}
+	opts := &Options{}
+	m := New(opts)
+	defer m.Drain()
+	foo := NewItemWithTTL("hello", 1*time.Second)
+	if err := m.Set("foo", foo, xx); err != ErrNotExist {
+		t.Fatal(err)
+	}
+	if item := m.Get("foo"); item != nil {
+		t.Fatalf("Not expecting item")
+	}
+	bar := NewItemWithTTL("world", 1*time.Second)
+	if err := m.Set("bar", bar, nil); err != nil {
+		t.Fatal(err)
+	}
+	if item := m.Get("bar"); item != bar || item.Value() != "world" {
+		t.Fatalf("Invalid item")
+	}
+	bar2 := NewItemWithTTL("world2", 1*time.Second)
+	if err := m.Set("bar", bar2, xx); err != nil {
+		t.Fatal(err)
+	}
+	if item := m.Get("bar"); item != bar2 || item.Value() != "world2" {
 		t.Fatalf("Invalid item")
 	}
 }
@@ -90,7 +119,7 @@ func TestMapSetDeleteGet(t *testing.T) {
 	m := New(opts)
 	defer m.Drain()
 	foo := NewItemWithTTL("hello", 1*time.Second)
-	if err := m.Set("foo", foo); err != nil {
+	if err := m.Set("foo", foo, nil); err != nil {
 		t.Fatal(err)
 	}
 	if item := m.Get("foo"); item != foo || item.Value() != "hello" {
@@ -151,13 +180,14 @@ func TestMapWaitExpired(t *testing.T) {
 }
 
 func testMapSetNIncreasing(t *testing.T, m *Map, n, min int, start time.Time) {
+	nx := &SetOptions{KeyExist: KeyExistNotYet}
 	for i := 0; i < n; i++ {
 		key := fmt.Sprintf("%d", i)
 		value := fmt.Sprintf("value for %s", key)
 		ttl := time.Duration(i+min) * time.Millisecond
 		expiration := start.Add(ttl)
 		item := NewItem(value, expiration)
-		if err := m.SetNX(key, item); err != nil {
+		if err := m.Set(key, item, nx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -167,6 +197,7 @@ func testMapSetNIncreasing(t *testing.T, m *Map, n, min int, start time.Time) {
 }
 
 func TestMapDrain(t *testing.T) {
+	nx := &SetOptions{KeyExist: KeyExistNotYet}
 	opts := &Options{}
 	m := New(opts)
 	defer m.Drain()
@@ -189,10 +220,10 @@ func TestMapDrain(t *testing.T) {
 		t.Fatalf("Not expecting item")
 	}
 	item := NewItemWithTTL("value", 100*time.Millisecond)
-	if err := m.Set("1", item); err != ErrDrained {
+	if err := m.Set("1", item, nil); err != ErrDrained {
 		t.Fatal(err)
 	}
-	if err := m.SetNX("1", item); err != ErrDrained {
+	if err := m.Set("1", item, nx); err != ErrDrained {
 		t.Fatal(err)
 	}
 	if item := m.Delete("1"); item != nil {
@@ -210,7 +241,7 @@ func TestMapSetItemReuseEvict(t *testing.T) {
 	m := New(opts)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	for i := 0; i < 1000; i++ {
-		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
+		if err := m.Set(fmt.Sprintf("%d", i), value, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -224,9 +255,10 @@ func TestMapSetItemReuseEvict(t *testing.T) {
 }
 
 func testMapSetN(t *testing.T, m *Map, n int, d time.Duration) {
+	nx := &SetOptions{KeyExist: KeyExistNotYet}
 	for i := 0; i < n; i++ {
 		item := NewItemWithTTL("value", d)
-		if err := m.SetNX(fmt.Sprintf("%d", i), item); err != nil {
+		if err := m.Set(fmt.Sprintf("%d", i), item, nx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -245,14 +277,14 @@ func TestMapSetSetEvict(t *testing.T) {
 	m := New(opts)
 	defer m.Drain()
 	item := NewItemWithTTL("hello", 1*time.Second)
-	if err := m.Set("foo", item); err != nil {
+	if err := m.Set("foo", item, nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(evicted) != 0 {
 		t.Fatalf("Invalid length")
 	}
 	item = NewItemWithTTL("world", 2*time.Second)
-	if err := m.Set("foo", item); err != nil {
+	if err := m.Set("foo", item, nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(evicted) != 1 {
@@ -273,7 +305,7 @@ func TestMapExpireAlreadyExpired(t *testing.T) {
 	start := time.Now()
 	expiration := start.Add(-1 * time.Second)
 	item := NewItem("bar", expiration)
-	if err := m.Set("foo", item); err != nil {
+	if err := m.Set("foo", item, nil); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
@@ -301,7 +333,7 @@ func TestMapGetAlreadyExpired(t *testing.T) {
 	done := false
 	for i := 0; i < 1000 && !done; i++ {
 		item := NewItem("bar", expiration)
-		if err := m.Set("foo", item); err != nil {
+		if err := m.Set("foo", item, nil); err != nil {
 			t.Fatal(err)
 		}
 		if item := m.Get("foo"); item != nil {
@@ -321,7 +353,7 @@ func TestMapGetAlreadyExpired(t *testing.T) {
 func BenchmarkMapGet1(b *testing.B) {
 	b.StopTimer()
 	m := New(nil)
-	if err := m.Set("foo", NewItemWithTTL("bar", 30*time.Minute)); err != nil {
+	if err := m.Set("foo", NewItemWithTTL("bar", 30*time.Minute), nil); err != nil {
 		b.Fatal(err)
 	}
 	b.StartTimer()
@@ -338,7 +370,7 @@ func BenchmarkMapSet1(b *testing.B) {
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		if err := m.Set("foo", value); err != nil {
+		if err := m.Set("foo", value, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -347,15 +379,34 @@ func BenchmarkMapSet1(b *testing.B) {
 }
 
 func BenchmarkMapSetNX1(b *testing.B) {
+	nx := &SetOptions{KeyExist: KeyExistNotYet}
 	b.StopTimer()
 	m := New(nil)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
-	if err := m.SetNX("foo", value); err != nil {
+	if err := m.Set("foo", value, nx); err != nil {
 		b.Fatal(err)
 	}
 	for i := 0; i < b.N; i++ {
-		if err := m.SetNX("foo", value); err != ErrExists {
+		if err := m.Set("foo", value, nx); err != ErrExist {
+			b.Fatal("Expecting already exists")
+		}
+	}
+	b.StopTimer()
+	m.Drain()
+}
+
+func BenchmarkMapSetXX1(b *testing.B) {
+	xx := &SetOptions{KeyExist: KeyExistAlready}
+	b.StopTimer()
+	m := New(nil)
+	value := NewItemWithTTL("bar", 30*time.Minute)
+	b.StartTimer()
+	if err := m.Set("foo", value, nil); err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < b.N; i++ {
+		if err := m.Set("foo", value, xx); err != nil {
 			b.Fatal("Expecting already exists")
 		}
 	}
@@ -380,7 +431,7 @@ func BenchmarkMapSetDelete1(b *testing.B) {
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		if err := m.Set("foo", value); err != nil {
+		if err := m.Set("foo", value, nil); err != nil {
 			b.Fatal(err)
 		}
 		m.Delete("foo")
@@ -400,7 +451,7 @@ func BenchmarkMapSetDrainN(b *testing.B) {
 	m := New(opts)
 	value := NewItemWithTTL("bar", 30*time.Minute)
 	for i := 0; i < b.N; i++ {
-		if err := m.Set(fmt.Sprintf("%d", i), value); err != nil {
+		if err := m.Set(fmt.Sprintf("%d", i), value, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
