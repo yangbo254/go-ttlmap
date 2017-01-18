@@ -1,24 +1,19 @@
 package ttlmap
 
 import (
+	"math"
 	"testing"
 	"time"
 )
 
-func TestNewItem(t *testing.T) {
+func TestNewItemWithExpiration(t *testing.T) {
 	ttl := 1 * time.Second
 	expiration := time.Now().Add(ttl)
-	item := NewItem("foo", expiration)
-	if item == nil {
-		t.Fatalf("Expecting item")
-	}
+	item := NewItem("foo", WithExpiration(expiration))
 	if item.Value() != "foo" {
 		t.Fatalf("Invalid value")
 	}
-	diff := item.TTL() - ttl
-	if diff < 0 {
-		diff = -diff
-	}
+	diff := ttl - item.TTL()
 	if diff > 10*time.Millisecond {
 		t.Fatalf("Invalid TTL")
 	}
@@ -36,20 +31,46 @@ func TestNewItem(t *testing.T) {
 	if !item.Expired() {
 		t.Fatalf("Expecting expired")
 	}
+	if !item.Expires() {
+		t.Fatalf("Expecting expires")
+	}
 }
 
 func TestNewItemWithTTL(t *testing.T) {
 	ttl := 10 * time.Second
+	item := NewItem("foo", WithTTL(ttl))
+	if item.Value() != "foo" {
+		t.Fatalf("Invalid value")
+	}
 	expectedExpiration := time.Now().Add(ttl)
-	item := NewItemWithTTL("foo", ttl)
-	if item == nil {
-		t.Fatalf("Expecting item")
-	}
 	diff := item.Expiration().Sub(expectedExpiration)
-	if diff < 0 {
-		diff = -diff
-	}
 	if diff > 10*time.Millisecond {
 		t.Fatalf("Invalid expiration")
+	}
+	if !item.Expires() {
+		t.Fatalf("Expecting expires")
+	}
+}
+
+func TestNewItemWithoutExpiration(t *testing.T) {
+	item := NewItem("foo", nil)
+	if item.Value() != "foo" {
+		t.Fatalf("Invalid value")
+	}
+	if item.TTL() != time.Duration(math.MaxInt64) {
+		t.Fatalf("Not expecting TTL")
+	}
+	time.Sleep(1 * time.Second)
+	if item.TTL() != time.Duration(math.MaxInt64) {
+		t.Fatalf("Not expecting TTL")
+	}
+	if item.Expired() {
+		t.Fatalf("Not expecting expired")
+	}
+	if item.Expires() {
+		t.Fatalf("Not expecting expires")
+	}
+	if !item.Expiration().IsZero() {
+		t.Fatalf("Not expecting expiration")
 	}
 }

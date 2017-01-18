@@ -11,6 +11,8 @@ var (
 	ErrDrained  = errors.New("map was drained")
 )
 
+var zeroItem Item
+
 // Map is the equivalent of a map[string]interface{} but with expirable Items.
 type Map struct {
 	store  *store
@@ -39,50 +41,55 @@ func (m *Map) Len() int {
 	return n
 }
 
-// Get returns the item in the map given its key.
-func (m *Map) Get(key string) *Item {
+// Get returns the item in the map with the given key.
+// ErrNotExist will be returned if the key does not exist.
+// ErrDrained will be returned if the map is already drained.
+func (m *Map) Get(key string) (Item, error) {
 	m.store.RLock()
 	if m.keeper.drained {
 		m.store.RUnlock()
-		return nil
+		return zeroItem, ErrDrained
 	}
-	pqi := m.store.kv[key]
+	if pqi := m.store.kv[key]; pqi != nil {
+		item := *pqi.item
+		m.store.RUnlock()
+		return item, nil
+	}
 	m.store.RUnlock()
-	if pqi != nil {
-		return pqi.item
-	}
-	return nil
+	return zeroItem, ErrNotExist
 }
 
-// Set assigns an expirable Item with the specified key in the map.
+// Set assigns an Item with to the specified key in the map.
 // ErrExist or ErrNotExist may be returned depending on opts.KeyExist.
 // ErrDrained will be returned if the map is already drained.
-func (m *Map) Set(key string, item *Item, opts *SetOptions) error {
+func (m *Map) Set(key string, item Item, opts *SetOptions) error {
 	m.store.Lock()
 	if m.keeper.drained {
 		m.store.Unlock()
 		return ErrDrained
 	}
-	err := m.set(key, item, opts)
+	err := m.set(key, &item, opts)
 	m.store.Unlock()
 	return err
 }
 
-// Delete deletes the item with the specified key in the map.
-// If an item is found, it is returned.
-func (m *Map) Delete(key string) *Item {
+// Delete deletes the item with the specified key from the map.
+// ErrNotExist will be returned if the key does not exist.
+// ErrDrained will be returned if the map is already drained.
+func (m *Map) Delete(key string) (Item, error) {
 	m.store.Lock()
 	if m.keeper.drained {
 		m.store.Unlock()
-		return nil
+		return zeroItem, ErrDrained
 	}
 	if pqi := m.store.kv[key]; pqi != nil {
 		m.delete(pqi)
+		item := *pqi.item
 		m.store.Unlock()
-		return pqi.item
+		return item, nil
 	}
 	m.store.Unlock()
-	return nil
+	return zeroItem, ErrNotExist
 }
 
 // Draining returns the channel that is closed when the map starts draining.

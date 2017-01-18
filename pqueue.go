@@ -13,7 +13,15 @@ func (pq pqueue) Len() int {
 }
 
 func (pq pqueue) Less(i, j int) bool {
-	return pq[i].item.expiration.Before(pq[j].item.expiration)
+	pqi := pq[i].item
+	pqj := pq[j].item
+	if pqi.expires {
+		if pqj.expires {
+			return pqi.expiration.Before(pqj.expiration)
+		}
+		return true
+	}
+	return false
 }
 
 func (pq pqueue) Swap(i, j int) {

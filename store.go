@@ -9,8 +9,8 @@ type store struct {
 	sync.RWMutex
 	kv           map[string]*pqitem
 	pq           pqueue
-	onWillExpire func(key string, item *Item)
-	onWillEvict  func(key string, item *Item)
+	onWillExpire func(key string, item Item)
+	onWillEvict  func(key string, item Item)
 }
 
 func newStore(opts *Options) *store {
@@ -35,7 +35,7 @@ func (s *store) delete(pqi *pqitem) {
 func (s *store) tryExpire(pqi *pqitem) bool {
 	if pqi.item.Expired() {
 		if s.onWillExpire != nil {
-			s.onWillExpire(pqi.key, pqi.item)
+			s.onWillExpire(pqi.key, *pqi.item)
 		}
 		s.evict(pqi)
 		return true
@@ -45,7 +45,7 @@ func (s *store) tryExpire(pqi *pqitem) bool {
 
 func (s *store) evict(pqi *pqitem) {
 	if s.onWillEvict != nil {
-		s.onWillEvict(pqi.key, pqi.item)
+		s.onWillEvict(pqi.key, *pqi.item)
 	}
 	s.delete(pqi)
 }
@@ -61,7 +61,7 @@ func (s *store) evictExpired() {
 func (s *store) drain() {
 	for _, pqi := range s.pq {
 		if s.onWillEvict != nil {
-			s.onWillEvict(pqi.key, pqi.item)
+			s.onWillEvict(pqi.key, *pqi.item)
 		}
 	}
 	s.kv = nil

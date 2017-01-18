@@ -3,19 +3,23 @@ package ttlmap
 // Options for initializing a new Map.
 type Options struct {
 	InitialCapacity int
-	OnWillExpire    func(key string, item *Item)
-	OnWillEvict     func(key string, item *Item)
+	OnWillExpire    func(key string, item Item)
+	OnWillEvict     func(key string, item Item)
 }
 
+// KeyExistMode represents a restriction on the existence of a key for the operation to succeed.
 type KeyExistMode int
 
 const (
+	// KeyExistDontCare can be used to ignore wether a key exists or not.
 	KeyExistDontCare KeyExistMode = 0
-	KeyExistNotYet   KeyExistMode = 1
-	KeyExistAlready  KeyExistMode = 2
+	// KeyExistNotYet fails the operation if the key exists already.
+	KeyExistNotYet KeyExistMode = 1
+	// KeyExistAlready fails the opration if the key does not exist already.
+	KeyExistAlready KeyExistMode = 2
 )
 
-// Options for setting items on a Map.
+// SetOptions for setting items on a Map.
 type SetOptions struct {
 	KeyExist KeyExistMode
 }
