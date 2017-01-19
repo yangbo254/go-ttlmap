@@ -7,7 +7,8 @@ type Options struct {
 	OnWillEvict     func(key string, item Item)
 }
 
-// KeyExistMode represents a restriction on the existence of a key for the operation to succeed.
+// KeyExistMode represents a restriction on the existence of a key for the
+// operation to succeed.
 type KeyExistMode int
 
 const (

@@ -336,11 +336,11 @@ func TestMapDrain(t *testing.T) {
 	if err := m.Set("1", item, nx); err != ErrDrained {
 		t.Fatal(err)
 	}
-	if item, err := m.Update("1", item, nil); item != zeroItem || err != ErrDrained {
-		t.Fatal(err)
+	if item2, err := m.Update("1", item, nil); item2 != zeroItem || err != ErrDrained {
+		t.Fatalf("Invalid item=%v err=%v", item2, err)
 	}
-	if item, err := m.Delete("1"); item != zeroItem || err != ErrDrained {
-		t.Fatalf("Invalid item=%v err=%v", item, err)
+	if item2, err := m.Delete("1"); item2 != zeroItem || err != ErrDrained {
+		t.Fatalf("Invalid item=%v err=%v", item2, err)
 	}
 }
 

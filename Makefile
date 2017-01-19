@@ -7,12 +7,7 @@ deps:
 	gometalinter --install
 
 gometalinter:
-	gometalinter --vendor --deadline=1m --tests \
-		--enable=gofmt \
-		--enable=goimports \
-		--enable=lll \
-		--enable=misspell \
-		--enable=unused
+	gometalinter --vendor --deadline=1m --tests --enable-all
 
 test:
 	go test -v -race -cpu=1,2,4 -coverprofile=coverage.txt -covermode=atomic -benchmem -bench .
