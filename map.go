@@ -59,7 +59,7 @@ func (m *Map) Get(key string) (Item, error) {
 	return zeroItem, ErrNotExist
 }
 
-// Set assigns an Item with to the specified key in the map.
+// Set assigns an item with the specified key in the map.
 // ErrExist or ErrNotExist may be returned depending on opts.KeyExist.
 // ErrDrained will be returned if the map is already drained.
 func (m *Map) Set(key string, item Item, opts *SetOptions) error {
@@ -71,6 +71,25 @@ func (m *Map) Set(key string, item Item, opts *SetOptions) error {
 	err := m.set(key, &item, opts)
 	m.store.Unlock()
 	return err
+}
+
+// Update updates an item with the specified key in the map and returns it.
+// ErrNotExist will be returned if the key does not exist.
+// ErrDrained will be returned if the map is already drained.
+func (m *Map) Update(key string, item Item, opts *UpdateOptions) (Item, error) {
+	m.store.Lock()
+	if m.keeper.drained {
+		m.store.Unlock()
+		return zeroItem, ErrDrained
+	}
+	if pqi := m.store.kv[key]; pqi != nil {
+		m.update(pqi, &item, opts)
+		item = *pqi.item
+		m.store.Unlock()
+		return item, nil
+	}
+	m.store.Unlock()
+	return zeroItem, ErrNotExist
 }
 
 // Delete deletes the item with the specified key from the map.
@@ -123,6 +142,23 @@ func (m *Map) set(key string, item *Item, opts *SetOptions) error {
 		m.keeper.signalUpdate()
 	}
 	return nil
+}
+
+func (m *Map) update(pqi *pqitem, item *Item, opts *UpdateOptions) {
+	if opts != nil {
+		if opts.KeepValue {
+			item.value = pqi.item.value
+		}
+		if opts.KeepExpiration {
+			item.expiration = pqi.item.expiration
+			item.expires = pqi.item.expires
+		}
+	}
+	pqi.item = item
+	m.store.fix(pqi)
+	if pqi.index == 0 {
+		m.keeper.signalUpdate()
+	}
 }
 
 func (m *Map) expireOrEvict(pqi *pqitem) {

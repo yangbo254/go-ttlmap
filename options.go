@@ -30,3 +30,9 @@ func (opts *SetOptions) keyExist() KeyExistMode {
 	}
 	return opts.KeyExist
 }
+
+// UpdateOptions for updating items on a Map.
+type UpdateOptions struct {
+	KeepValue      bool
+	KeepExpiration bool
+}

@@ -32,6 +32,10 @@ func (s *store) delete(pqi *pqitem) {
 	heap.Remove(&s.pq, pqi.index)
 }
 
+func (s *store) fix(pqi *pqitem) {
+	heap.Fix(&s.pq, pqi.index)
+}
+
 func (s *store) tryExpire(pqi *pqitem) bool {
 	if pqi.item.Expired() {
 		if s.onWillExpire != nil {

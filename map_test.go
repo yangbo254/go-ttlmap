@@ -114,6 +114,48 @@ func TestMapSetXXGet(t *testing.T) {
 	}
 }
 
+func TestMapUpdateGet(t *testing.T) {
+	opts := &Options{}
+	m := New(opts)
+	defer m.Drain()
+	foo := NewItem("hello", WithTTL(1*time.Second))
+	if item, err := m.Update("foo", foo, nil); item != zeroItem || err != ErrNotExist {
+		t.Fatal(err)
+	}
+	if item, err := m.Get("foo"); item != zeroItem || err != ErrNotExist {
+		t.Fatal(err)
+	}
+	bar := NewItem("world", WithTTL(1*time.Second))
+	if err := m.Set("bar", bar, nil); err != nil {
+		t.Fatal(err)
+	}
+	bar2 := NewItem("world2", WithTTL(2*time.Second))
+	if item, err := m.Update("bar", bar2, nil); err != nil || item != bar2 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+	if item, err := m.Get("bar"); err != nil || item != bar2 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+	bar3 := NewItem("world3", WithTTL(3*time.Second))
+	keepval := &UpdateOptions{KeepValue: true}
+	bar4 := NewItem("world2", WithExpiration(bar3.Expiration()))
+	if item, err := m.Update("bar", bar3, keepval); err != nil || item != bar4 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+	if item, err := m.Get("bar"); err != nil || item != bar4 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+	bar5 := NewItem("world5", WithTTL(4*time.Second))
+	keepexp := &UpdateOptions{KeepExpiration: true}
+	bar6 := NewItem("world5", WithExpiration(bar4.Expiration()))
+	if item, err := m.Update("bar", bar5, keepexp); err != nil || item != bar6 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+	if item, err := m.Get("bar"); err != nil || item != bar6 {
+		t.Fatalf("Invalid item=%v err=%v", item, err)
+	}
+}
+
 func TestMapSetDeleteGet(t *testing.T) {
 	opts := &Options{}
 	m := New(opts)
@@ -292,6 +334,9 @@ func TestMapDrain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := m.Set("1", item, nx); err != ErrDrained {
+		t.Fatal(err)
+	}
+	if item, err := m.Update("1", item, nil); item != zeroItem || err != ErrDrained {
 		t.Fatal(err)
 	}
 	if item, err := m.Delete("1"); item != zeroItem || err != ErrDrained {
