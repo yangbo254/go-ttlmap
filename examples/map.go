@@ -10,10 +10,10 @@ import (
 func main() {
 	options := &ttlmap.Options{
 		InitialCapacity: 1024,
-		OnWillExpire: func(key string, item *ttlmap.Item) {
+		OnWillExpire: func(key string, item ttlmap.Item) {
 			fmt.Printf("expired: [%s=%v]\n", key, item.Value())
 		},
-		OnWillEvict: func(key string, item *ttlmap.Item) {
+		OnWillEvict: func(key string, item ttlmap.Item) {
 			fmt.Printf("evicted: [%s=%v]\n", key, item.Value())
 		},
 	}
@@ -21,8 +21,8 @@ func main() {
 	// don't forget to drain the map when you don't need it
 	defer m.Drain()
 
-	m.Set("foo", ttlmap.NewItemWithTTL("hello", 1000*time.Millisecond))
-	m.Set("bar", ttlmap.NewItemWithTTL("world", 800*time.Millisecond))
+	m.Set("foo", ttlmap.NewItem("hello", ttlmap.WithTTL(1000*time.Millisecond)), nil)
+	m.Set("bar", ttlmap.NewItem("world", ttlmap.WithTTL(800*time.Millisecond)), nil)
 
 	printStatus(m, "foo")
 	printStatus(m, "bar")
@@ -39,11 +39,11 @@ func main() {
 }
 
 func printStatus(m *ttlmap.Map, key string) {
-	item := m.Get(key)
-	if item != nil {
+	item, err := m.Get(key)
+	if err == nil {
 		fmt.Printf("status: [%s=%v] will expire in: %v\n", key, item.Value(), item.TTL())
 	} else {
-		fmt.Printf("status: [%s] not in map anymore\n", key)
+		fmt.Printf("status: [%s] %v\n", key, err)
 	}
 }
 
