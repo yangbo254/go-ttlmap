@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/imkira/go-ttlmap"
+	"github.com/yangbo254/go-ttlmap"
 )
 
 func main() {
